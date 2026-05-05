@@ -29,8 +29,15 @@ jobs:
 
       - run: npm run compile
 
+      - name: Drop vscode:prepublish hook (already compiled above)
+        run: |
+          node -e "const fs=require('fs'); const p=JSON.parse(fs.readFileSync('package.json')); delete p.scripts['vscode:prepublish']; fs.writeFileSync('package.json', JSON.stringify(p,null,2))"
+
+      - name: Drop devDependencies before packaging
+        run: npm prune --omit=dev
+
       - name: Package VSIX
-        run: npx --yes @vscode/vsce package --no-dependencies --skip-license -o overleaf-gitlive.vsix
+        run: npx --yes @vscode/vsce package --skip-license -o overleaf-gitlive.vsix
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
