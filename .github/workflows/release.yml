@@ -1,0 +1,47 @@
+name: Build and Release VSIX
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Release tag (e.g. v0.1.2-fix.1). Leave blank to build artifact only.'
+        required: false
+        default: ''
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - run: npm ci
+
+      - run: npm run compile
+
+      - name: Package VSIX
+        run: npx --yes @vscode/vsce package --no-dependencies --skip-license -o overleaf-gitlive.vsix
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: overleaf-gitlive-vsix
+          path: overleaf-gitlive.vsix
+
+      - name: Create Release
+        if: startsWith(github.ref, 'refs/tags/v') || inputs.tag != ''
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ inputs.tag != '' && inputs.tag || github.ref_name }}
+          files: overleaf-gitlive.vsix
+          generate_release_notes: true
