@@ -64,6 +64,7 @@ export interface CompileResult {
     buildId?: string;
     outputFiles?: OutputFile[];
     pdfUrl?: string;
+    clsiServerId?: string;
     error?: string;
 }
 
@@ -157,6 +158,7 @@ export async function compile(identity: Identity, session?: SessionManager): Pro
             buildId,
             outputFiles,
             pdfUrl: pdfFile?.url,
+            clsiServerId: data.clsiServerId,
         };
     };
 
@@ -175,17 +177,25 @@ export async function compile(identity: Identity, session?: SessionManager): Pro
     }
 }
 
-export async function downloadPdf(serverUrl: string, cookies: string, pdfUrl: string, session?: SessionManager): Promise<Buffer> {
-    const url = `${serverUrl}/${pdfUrl.replace(/^\/+/, '')}`;
+export async function downloadPdf(
+    serverUrl: string,
+    cookies: string,
+    pdfUrl: string,
+    session?: SessionManager,
+    clsiServerId?: string,
+): Promise<Buffer> {
+    const base = `${serverUrl}/${pdfUrl.replace(/^\/+/, '')}`;
+    const url = clsiServerId
+        ? `${base}${base.includes('?') ? '&' : '?'}clsiserverid=${encodeURIComponent(clsiServerId)}`
+        : base;
     const agent = getAgent(serverUrl);
     const maxRetries = 4;
 
     for (let attempt = 0; attempt < maxRetries; attempt++) {
+        const currentCookies = session ? session.identity.cookies : cookies;
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 30000);
         try {
-            const currentCookies = session ? session.identity.cookies : cookies;
-            const controller = new AbortController();
-            const timeout = setTimeout(() => controller.abort(), 30000);
-
             const res = await fetch(url, {
                 method: 'GET',
                 redirect: 'follow',
@@ -197,7 +207,6 @@ export async function downloadPdf(serverUrl: string, cookies: string, pdfUrl: st
                     'Accept': 'application/pdf',
                 },
             });
-            clearTimeout(timeout);
 
             if (session) { await session.captureCookies(res.headers); }
 
@@ -223,6 +232,8 @@ export async function downloadPdf(serverUrl: string, cookies: string, pdfUrl: st
             if (isLast) { throw err; }
             const delay = 1000 * Math.pow(2, attempt); // 1s, 2s, 4s
             await new Promise(r => setTimeout(r, delay));
+        } finally {
+            clearTimeout(timeout);
         }
     }
 

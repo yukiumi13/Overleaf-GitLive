@@ -81,6 +81,7 @@ export class PdfPoller {
                 currentId.cookies,
                 result.pdfUrl,
                 this.session,
+                result.clsiServerId,
             );
 
             this.lastBuildId = result.buildId;
